@@ -351,6 +351,12 @@
             if (frame % 30 === 0) { // Update score every 0.5 seconds
                 score++;
                 document.getElementById('score').textContent = `Score: ${score}`;
+                
+                // Check for victory at 30 points
+                if (score >= 30) {
+                    gameOver = true;
+                    win = true;
+                }
             }
 
             // Remove off-screen obstacles
@@ -410,7 +416,19 @@
                 ctx.fillStyle = win ? '#27ae60' : '#c0392b';
                 ctx.font = 'bold 36px Arial';
                 ctx.textAlign = 'center';
-                ctx.fillText(win ? '🎉 You caught the cake! 🎉' : '💥 Game Over! 💥', WIDTH/2, HEIGHT/2 - 40);
+                
+                // Special message for 30-point victory
+                if (win && score >= 30) {
+                    ctx.fillStyle = '#FFD700'; // Gold color
+                    ctx.fillText("YOU'RE OLD. HAPPY 30th THOM! 🎂", WIDTH/2, HEIGHT/2 - 60);
+                    ctx.font = 'bold 28px Arial';
+                    ctx.fillStyle = '#fff';
+                    ctx.fillText('🏆 MILESTONE ACHIEVED! 🏆', WIDTH/2, HEIGHT/2 - 20);
+                } else if (win) {
+                    ctx.fillText('🎉 You caught the cake! 🎉', WIDTH/2, HEIGHT/2 - 40);
+                } else {
+                    ctx.fillText('💥 Game Over! 💥', WIDTH/2, HEIGHT/2 - 40);
+                }
                 
                 ctx.fillStyle = '#fff';
                 ctx.font = 'bold 24px Arial';
