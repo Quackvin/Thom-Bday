@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Thom's Cake Chase</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: 'Comic Sans MS', cursive, Arial, sans-serif;
+            min-height: 100vh;
+            padding: 10px;
+            touch-action: none;
+            user-select: none;
+        }
+        
+        h1 {
+            color: #fff;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            margin: 10px 0;
+            font-size: 2em;
+            text-align: center;
+        }
+        
+        #gameCanvas {
+            background: #fff;
+            border: 4px solid #333;
+            border-radius: 15px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+            margin: 10px 0;
+            max-width: 100%;
+            height: auto;
+        }
+        
+        #instructions {
+            color: #fff;
+            text-align: center;
+            margin: 10px 0;
+            font-size: 1.1em;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            padding: 0 10px;
+        }
+        
+        #score {
+            color: #fff;
+            font-size: 1.3em;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            margin: 10px 0;
+        }
+        
+        /* Mobile Controls */
+        #mobileControls {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+        }
+        
+        .control-row {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 5px 0;
+        }
+        
+        .control-btn {
+            width: 60px;
+            height: 60px;
+            background: rgba(255,255,255,0.9);
+            border: 2px solid #333;
+            border-radius: 50%;
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            cursor: pointer;
+            touch-action: none;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            transition: all 0.1s ease;
+        }
+        
+        .control-btn:active {
+            transform: scale(0.9);
+            background: rgba(255,255,255,0.7);
+        }
+        
+        /* Responsive design */
+        @media (max-width: 768px) {
+            #mobileControls {
+                display: block;
+            }
+            
+            h1 {
+                font-size: 1.5em;
+            }
+            
+            #instructions {
+                font-size: 0.9em;
+            }
+            
+            #gameCanvas {
+                width: 95vw;
+                height: 60vh;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .control-btn {
+                width: 50px;
+                height: 50px;
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>🎂 Thom's Cake Chase 🎂</h1>
+    <div id="score">Score: 0</div>
+    <canvas id="gameCanvas" width="600" height="400"></canvas>
+    <div id="instructions">
+        Use <b>Arrow keys</b> to move Thom. Catch the cake and dodge the obstacles!
+        <br>Touch controls available on mobile devices.
+    </div>
+    
+    <!-- Mobile Controls -->
+    <div id="mobileControls">
+        <div class="control-row">
+            <button class="control-btn" id="btnUp">↑</button>
+        </div>
+        <div class="control-row">
+            <button class="control-btn" id="btnLeft">←</button>
+            <button class="control-btn" id="btnDown">↓</button>
+            <button class="control-btn" id="btnRight">→</button>
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const WIDTH = canvas.width;
+        const HEIGHT = canvas.height;
+
+        // Player (Thom)
+        const player = {
+            x: 50,
+            y: HEIGHT / 2 - 25,
+            w: 40,
+            h: 40,
+            color: '#4a90e2',
+            speed: 5
+        };
+
+        // Cake
+        const cake = {
+            x: WIDTH - 90,
+            y: Math.random() * (HEIGHT - 40),
+            w: 40,
+            h: 40,
+            color: '#f5a623',
+            vx: -2
+        };
+
+        // Obstacles
+        const obstacles = [];
+        function spawnObstacle() {
+            const size = 30 + Math.random() * 20;
+            obstacles.push({
+                x: WIDTH,
+                y: Math.random() * (HEIGHT - size),
+                w: size,
+                h: size,
+                color: '#d0021b',
+                vx: -3 - Math.random() * 2
+            });
+        }
+
+        let keys = {};
+        let gameOver = false;
+        let win = false;
+        let frame = 0;
+        let score = 0;
+        let gameStarted = false;
+
+        // Keyboard controls
+        document.addEventListener('keydown', e => keys[e.key] = true);
+        document.addEventListener('keyup', e => keys[e.key] = false);
+
+        // Mobile controls
+        const mobileControls = {
+            up: false,
+            down: false,
+            left: false,
+            right: false
+        };
+
+        // Setup mobile button controls
+        function setupMobileControls() {
+            const btnUp = document.getElementById('btnUp');
+            const btnDown = document.getElementById('btnDown');
+            const btnLeft = document.getElementById('btnLeft');
+            const btnRight = document.getElementById('btnRight');
+
+            // Touch start events
+            btnUp.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                mobileControls.up = true;
+            });
+            btnDown.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                mobileControls.down = true;
+            });
+            btnLeft.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                mobileControls.left = true;
+            });
+            btnRight.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                mobileControls.right = true;
+            });
+
+            // Touch end events
+            btnUp.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                mobileControls.up = false;
+            });
+            btnDown.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                mobileControls.down = false;
+            });
+            btnLeft.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                mobileControls.left = false;
+            });
+            btnRight.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                mobileControls.right = false;
+            });
+
+            // Mouse events for desktop testing
+            btnUp.addEventListener('mousedown', () => mobileControls.up = true);
+            btnDown.addEventListener('mousedown', () => mobileControls.down = true);
+            btnLeft.addEventListener('mousedown', () => mobileControls.left = true);
+            btnRight.addEventListener('mousedown', () => mobileControls.right = true);
+
+            btnUp.addEventListener('mouseup', () => mobileControls.up = false);
+            btnDown.addEventListener('mouseup', () => mobileControls.down = false);
+            btnLeft.addEventListener('mouseup', () => mobileControls.left = false);
+            btnRight.addEventListener('mouseup', () => mobileControls.right = false);
+        }
+
+        // Initialize mobile controls
+        setupMobileControls();
+
+        function drawPlayer() {
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x, player.y, player.w, player.h);
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 18px Arial';
+            ctx.fillText('Thom', player.x + 2, player.y + 25);
+        }
+
+        function drawCake() {
+            // Draw cake with better visuals
+            ctx.fillStyle = cake.color;
+            ctx.fillRect(cake.x, cake.y, cake.w, cake.h);
+            
+            // Add cake details
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(cake.x + 5, cake.y + 5, 8, 8); // Cherry
+            ctx.fillRect(cake.x + 20, cake.y + 8, 15, 4); // Icing
+            
+            ctx.fillStyle = '#333';
+            ctx.font = 'bold 12px Arial';
+            ctx.fillText('🎂', cake.x + 8, cake.y + 25);
+        }
+
+        function drawObstacles() {
+            obstacles.forEach(obs => {
+                // Draw obstacles with spikes
+                ctx.fillStyle = obs.color;
+                ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+                
+                // Add spike details
+                ctx.fillStyle = '#8B0000';
+                ctx.beginPath();
+                ctx.moveTo(obs.x + obs.w/2, obs.y - 5);
+                ctx.lineTo(obs.x + obs.w/2 - 5, obs.y + 5);
+                ctx.lineTo(obs.x + obs.w/2 + 5, obs.y + 5);
+                ctx.closePath();
+                ctx.fill();
+            });
+        }
+
+        function movePlayer() {
+            // Combine keyboard and mobile controls
+            if ((keys['ArrowUp'] || mobileControls.up) && player.y > 0) player.y -= player.speed;
+            if ((keys['ArrowDown'] || mobileControls.down) && player.y < HEIGHT - player.h) player.y += player.speed;
+            if ((keys['ArrowLeft'] || mobileControls.left) && player.x > 0) player.x -= player.speed;
+            if ((keys['ArrowRight'] || mobileControls.right) && player.x < WIDTH - player.w) player.x += player.speed;
+        }
+
+        function moveCake() {
+            // Cake moves away from Thom if close
+            let dx = cake.x - player.x;
+            let dy = cake.y - player.y;
+            let dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist < 120) {
+                // Move cake away from player
+                cake.x += (dx/dist) * 3;
+                cake.y += (dy/dist) * 3;
+            } else {
+                // Cake moves left slowly
+                cake.x += cake.vx;
+            }
+            // Keep cake in bounds
+            cake.x = Math.max(0, Math.min(WIDTH - cake.w, cake.x));
+            cake.y = Math.max(0, Math.min(HEIGHT - cake.h, cake.y));
+        }
+
+        function moveObstacles() {
+            obstacles.forEach(obs => {
+                obs.x += obs.vx;
+            });
+        }
+
+        function checkCollision(a, b) {
+            return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+        }
+
+        function update() {
+            if (gameOver) return;
+            movePlayer();
+            moveCake();
+            moveObstacles();
+
+            // Update score based on survival time
+            if (frame % 30 === 0) { // Update score every 0.5 seconds
+                score++;
+                document.getElementById('score').textContent = `Score: ${score}`;
+            }
+
+            // Remove off-screen obstacles
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                if (obstacles[i].x + obstacles[i].w < 0) {
+                    obstacles.splice(i, 1);
+                    score += 5; // Bonus points for dodging obstacles
+                }
+            }
+
+            // Check collision with obstacles
+            for (let obs of obstacles) {
+                if (checkCollision(player, obs)) {
+                    gameOver = true;
+                    win = false;
+                }
+            }
+
+            // Check collision with cake
+            if (checkCollision(player, cake)) {
+                gameOver = true;
+                win = true;
+                score += 100; // Big bonus for catching the cake
+            }
+
+            // Reset cake if it goes off screen
+            if (cake.x < 0) {
+                cake.x = WIDTH - 90;
+                cake.y = Math.random() * (HEIGHT - 40);
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, WIDTH, HEIGHT);
+            
+            // Draw background pattern
+            ctx.fillStyle = '#f0f8ff';
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+            
+            // Add some decorative elements
+            ctx.fillStyle = '#e6f3ff';
+            for (let i = 0; i < 5; i++) {
+                ctx.beginPath();
+                ctx.arc(Math.random() * WIDTH, Math.random() * HEIGHT, 20, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            drawPlayer();
+            drawCake();
+            drawObstacles();
+            
+            if (gameOver) {
+                // Game over overlay
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, WIDTH, HEIGHT);
+                
+                ctx.fillStyle = win ? '#27ae60' : '#c0392b';
+                ctx.font = 'bold 36px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(win ? '🎉 You caught the cake! 🎉' : '💥 Game Over! 💥', WIDTH/2, HEIGHT/2 - 40);
+                
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 24px Arial';
+                ctx.fillText(`Final Score: ${score}`, WIDTH/2, HEIGHT/2);
+                
+                ctx.font = '18px Arial';
+                ctx.fillText('Tap or press any key to play again', WIDTH/2, HEIGHT/2 + 40);
+                
+                ctx.textAlign = 'left';
+            }
+        }
+
+        function resetGame() {
+            // Reset player position
+            player.x = 50;
+            player.y = HEIGHT / 2 - 25;
+            
+            // Reset cake position
+            cake.x = WIDTH - 90;
+            cake.y = Math.random() * (HEIGHT - 40);
+            
+            // Clear obstacles
+            obstacles.length = 0;
+            
+            // Reset game state
+            gameOver = false;
+            win = false;
+            frame = 0;
+            score = 0;
+            
+            // Update score display
+            document.getElementById('score').textContent = `Score: ${score}`;
+        }
+
+        function gameLoop() {
+            frame++;
+            if (frame % 60 === 0) spawnObstacle();
+            update();
+            draw();
+            if (!gameOver) {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // Handle restart
+        function handleRestart() {
+            if (gameOver) {
+                resetGame();
+                gameLoop();
+            }
+        }
+
+        // Add restart listeners
+        document.addEventListener('keydown', (e) => {
+            if (gameOver) {
+                handleRestart();
+            }
+        });
+
+        document.addEventListener('touchstart', (e) => {
+            if (gameOver) {
+                handleRestart();
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (gameOver) {
+                handleRestart();
+            }
+        });
+
+        // Start the game
+        gameLoop();
+    </script>
+</body>
+</html>
