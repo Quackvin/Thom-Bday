@@ -171,7 +171,8 @@
             w: 40,
             h: 40,
             color: '#f5a623',
-            vx: -2
+            vx: -3, // Increased base speed from -2 to -3
+            vy: 0   // Add vertical velocity for more movement
         };
 
         // Obstacles
@@ -314,21 +315,60 @@
         }
 
         function moveCake() {
-            // Cake moves away from Thom if close
+            // Cake moves away from Thom - much more evasive now
             let dx = cake.x - player.x;
             let dy = cake.y - player.y;
             let dist = Math.sqrt(dx*dx + dy*dy);
-            if (dist < 120) {
-                // Move cake away from player
-                cake.x += (dx/dist) * 3;
-                cake.y += (dy/dist) * 3;
+            
+            if (dist < 200) { // Increased detection range
+                // Much stronger evasive movement
+                let evadeSpeed = 6; // Increased from 3
+                cake.x += (dx/dist) * evadeSpeed;
+                cake.y += (dy/dist) * evadeSpeed;
+                
+                // Add some random jitter to make it even harder to predict
+                cake.x += (Math.random() - 0.5) * 4;
+                cake.y += (Math.random() - 0.5) * 4;
+                
+                // If player is getting too close, boost away dramatically
+                if (dist < 80) {
+                    cake.x += (dx/dist) * 10; // Boost speed when very close
+                    cake.y += (dy/dist) * 10;
+                    
+                    // 10% chance to teleport when very close
+                    if (Math.random() < 0.1) {
+                        cake.x = Math.random() * (WIDTH - cake.w);
+                        cake.y = Math.random() * (HEIGHT - cake.h);
+                    }
+                }
             } else {
-                // Cake moves left slowly
+                // Cake still moves but can change direction randomly
                 cake.x += cake.vx;
+                
+                // Random vertical movement even when player is far
+                if (Math.random() < 0.02) {
+                    cake.vy = (Math.random() - 0.5) * 3;
+                }
+                cake.y += cake.vy || 0;
             }
-            // Keep cake in bounds
-            cake.x = Math.max(0, Math.min(WIDTH - cake.w, cake.x));
-            cake.y = Math.max(0, Math.min(HEIGHT - cake.h, cake.y));
+            
+            // Keep cake in bounds with bouncing
+            if (cake.x < 0) {
+                cake.x = 0;
+                cake.vx = Math.abs(cake.vx);
+            }
+            if (cake.x > WIDTH - cake.w) {
+                cake.x = WIDTH - cake.w;
+                cake.vx = -Math.abs(cake.vx);
+            }
+            if (cake.y < 0) {
+                cake.y = 0;
+                cake.vy = Math.abs(cake.vy || 0);
+            }
+            if (cake.y > HEIGHT - cake.h) {
+                cake.y = HEIGHT - cake.h;
+                cake.vy = -Math.abs(cake.vy || 0);
+            }
         }
 
         function moveObstacles() {
@@ -347,23 +387,20 @@
             moveCake();
             moveObstacles();
 
-            // Update score based on survival time
-            if (frame % 30 === 0) { // Update score every 0.5 seconds
-                score++;
-                document.getElementById('score').textContent = `Score: ${score}`;
-                
-                // Check for victory at 30 points
-                if (score >= 30) {
-                    gameOver = true;
-                    win = true;
-                }
-            }
+            // No points for survival time - only for avoiding obstacles
 
-            // Remove off-screen obstacles
+            // Remove off-screen obstacles and give points for avoiding them
             for (let i = obstacles.length - 1; i >= 0; i--) {
                 if (obstacles[i].x + obstacles[i].w < 0) {
                     obstacles.splice(i, 1);
-                    score += 5; // Bonus points for dodging obstacles
+                    score += 1; // 1 point for each avoided obstacle
+                    document.getElementById('score').textContent = `Score: ${score}`;
+                    
+                    // Check for victory at 30 points
+                    if (score >= 30) {
+                        gameOver = true;
+                        win = true;
+                    }
                 }
             }
 
